@@ -33,7 +33,6 @@ const sensorSchema = new mongoose.Schema({
   altitude: { type: Number, required: true },
   humidity: { type: Number, required: true },
   dhtTemp: { type: Number, required: true },
-  combinedTemp: { type: Number, required: true },
   accelX: { type: Number, required: true },
   accelY: { type: Number, required: true },
   accelZ: { type: Number, required: true },
@@ -66,40 +65,52 @@ wss.on('connection', (ws) => {
   });
 });
 
-// Listen for incoming data from serial port
+// Listen for incoming data from the serial port
 parser.on('data', (line) => {
   console.log(`Received: ${line.trim()}`);
 
   if (line.trim().startsWith('{') && line.trim().endsWith('}')) {
     try {
       const sensorData = JSON.parse(line.trim());
+      console.log('Parsed sensor data:', sensorData);
 
-      // Validate the data (optional)
-      if (typeof sensorData.temperature === 'number' &&
-          typeof sensorData.pressure === 'number' &&
-          typeof sensorData.altitude === 'number' &&
-          typeof sensorData.humidity === 'number' &&
-          typeof sensorData.dhtTemp === 'number' &&
-          typeof sensorData.combinedTemp === 'number' &&
-          typeof sensorData.accelX === 'number' &&
-          typeof sensorData.accelY === 'number' &&
-          typeof sensorData.accelZ === 'number') {
-        
-        const newSensorData = new SensorData(sensorData);
+      // Map incoming data to the schema fields
+      const mappedData = {
+        temperature: sensorData.BMP_Temperature,
+        pressure: sensorData.BMP_Pressure,
+        altitude: sensorData.BMP_Altitude,
+        humidity: sensorData.DHT_Humidity,
+        dhtTemp: sensorData.DHT_Temperature,
+        accelX: sensorData.Accel_X,
+        accelY: sensorData.Accel_Y,
+        accelZ: sensorData.Accel_Z
+      };
+
+      // Validate the mapped data
+      if (typeof mappedData.temperature === 'number' &&
+        typeof mappedData.pressure === 'number' &&
+        typeof mappedData.altitude === 'number' &&
+        typeof mappedData.humidity === 'number' &&
+        typeof mappedData.dhtTemp === 'number' &&
+        typeof mappedData.accelX === 'number' &&
+        typeof mappedData.accelY === 'number' &&
+        typeof mappedData.accelZ === 'number') {
+
+        const newSensorData = new SensorData(mappedData);
         newSensorData.save()
           .then(() => {
             console.log('Sensor data saved to MongoDB');
-            
+
             // Broadcast to all WebSocket clients
             wss.clients.forEach((client) => {
               if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify(sensorData));
+                client.send(JSON.stringify(mappedData));
               }
             });
           })
           .catch(err => console.error('Error saving sensor data:', err));
       } else {
-        console.error('Invalid sensor data:', sensorData);
+        console.error('Invalid sensor data:', mappedData);
       }
     } catch (err) {
       console.error('Error parsing JSON:', err.message);
@@ -120,6 +131,7 @@ app.get('/data/history', (req, res) => {
     .catch(err => res.status(500).send('Error retrieving historical data'));
 });
 
+// Start the server
 server.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
 });
