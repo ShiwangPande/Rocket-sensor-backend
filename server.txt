@@ -13,21 +13,13 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json()); // To parse JSON bodies
 
-// Initialize Serial Port only if NOT in a cloud environment
-let serialPort;
-if (process.env.NODE_ENV !== 'production') {
-  serialPort = new SerialPort({
-    path: process.env.SERIAL_PORT_PATH || 'COM8', // Use environment variable
-    baudRate: parseInt(process.env.BAUD_RATE) || 9600,
-  });
-  const parser = serialPort.pipe(new ReadlineParser({ delimiter: '\n' }));
+// Initialize Serial Port
+const serialPort = new SerialPort({
+  path: process.env.SERIAL_PORT_PATH || 'COM8', // Use environment variable
+  baudRate: parseInt(process.env.BAUD_RATE) || 9600,
+});
 
-  // Listen for incoming data from the serial port
-  parser.on('data', (line) => {
-    console.log(`Received: ${line.trim()}`);
-    handleIncomingData(line); // Moved data handling to a function for clarity
-  });
-}
+const parser = serialPort.pipe(new ReadlineParser({ delimiter: '\n' }));
 
 // Connect to MongoDB Atlas
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
@@ -73,7 +65,10 @@ wss.on('connection', (ws) => {
   });
 });
 
-function handleIncomingData(line) {
+// Listen for incoming data from the serial port
+parser.on('data', (line) => {
+  console.log(`Received: ${line.trim()}`);
+
   if (line.trim().startsWith('{') && line.trim().endsWith('}')) {
     try {
       const sensorData = JSON.parse(line.trim());
@@ -123,7 +118,7 @@ function handleIncomingData(line) {
   } else {
     console.log('Ignored non-JSON message:', line.trim());
   }
-}
+});
 
 // Endpoint to get historical data (e.g., last 24 hours)
 app.get('/data/history', (req, res) => {
