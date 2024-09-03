@@ -23,10 +23,9 @@ if (process.env.NODE_ENV !== 'production') {
   const parser = serialPort.pipe(new ReadlineParser({ delimiter: '\n' }));
 
   // Listen for incoming data from the serial port
-  parser.on('data', (line) => {
-    console.log(`Received: ${line.trim()}`);
-    handleIncomingData(line); // Moved data handling to a function for clarity
-  });
+  parser.on('data', handleIncomingData);
+} else {
+  console.warn('Serial port initialization skipped in production environment');
 }
 
 // Connect to MongoDB Atlas
@@ -92,15 +91,7 @@ function handleIncomingData(line) {
       };
 
       // Validate the mapped data
-      if (typeof mappedData.temperature === 'number' &&
-        typeof mappedData.pressure === 'number' &&
-        typeof mappedData.altitude === 'number' &&
-        typeof mappedData.humidity === 'number' &&
-        typeof mappedData.dhtTemp === 'number' &&
-        typeof mappedData.accelX === 'number' &&
-        typeof mappedData.accelY === 'number' &&
-        typeof mappedData.accelZ === 'number') {
-
+      if (Object.values(mappedData).every(value => typeof value === 'number')) {
         const newSensorData = new SensorData(mappedData);
         newSensorData.save()
           .then(() => {
